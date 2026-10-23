@@ -18,6 +18,7 @@
   <script src="art.js" defer></script>
   <script src="audio.js" defer></script>
   <script src="game.js" defer></script>
+  <script src="controls.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -43,7 +44,7 @@
           <h1>Snack <span class="title-amp">&amp;</span><br><span>Dash</span></h1>
           <p class="japanese-title">日本語タイトル：食べ物集め鬼ごっこ</p>
           <p>逃げて、集めて、限界を超えろ。<br>鬼はどこまでも速くなる。</p>
-          <span class="micro-label">キーボード / ゲームパッド / タッチ対応</span>
+          <span class="micro-label">PCキーボード / Xbox・PS・Switch系ゲームパッド / スマホ・タブレットのタッチ対応</span>
         </div>
         <canvas id="heroCanvas" width="208" height="144" aria-label="ソルトと鬼、ハンバーガーのドット絵" role="img"></canvas>
       </div>
@@ -70,12 +71,31 @@
       <div class="play-heading"><div><div class="eyebrow" id="play-subtitle">GAME / HB MODE</div><h2 id="play-title">ハンバーガー回収</h2></div><button id="pause-btn" class="small-button" type="button">Ⅱ 一時停止</button></div>
       <div class="play-layout">
         <div class="arena-col">
-          <div class="game-frame"><canvas id="gameCanvas" width="320" height="240" tabindex="0" aria-label="Snack &amp; Dash（食べ物集め鬼ごっこ）のプレイ画面。方向キーで移動、Bかスペースでダッシュ。"></canvas></div>
-          <div class="game-caption"><label class="hitbox-live-toggle"><span>当たり判定</span><input type="checkbox" id="play-hitboxes" checked role="switch" aria-label="当たり判定を表示"><strong id="hitbox-live-status">ON</strong></label><span>C 表示切替</span><span>ESC 一時停止</span><span>←↑→↓ / WASD 移動</span><span>B / SPACE ダッシュ</span></div>
-          <div class="touch-controls" aria-label="タッチ操作">
-            <div class="dpad"><button type="button" data-dir="up" aria-label="上に移動">▲</button><div><button type="button" data-dir="left" aria-label="左に移動">◀</button><button type="button" data-dir="down" aria-label="下に移動">▼</button><button type="button" data-dir="right" aria-label="右に移動">▶</button></div></div>
-            <button type="button" id="touch-dash" class="dash-touch">DASH<span>B</span></button>
+          <div class="arena-interactive">
+            <div class="touch-controls" id="touch-controls" aria-label="スマホ・タブレット操作">
+              <div class="touch-move" id="touch-move">
+                <div class="joystick-area" id="joystick-area" role="group" aria-label="仮想ジョイスティック（ドラッグで移動）">
+                  <div class="joystick-base" id="joystick-base" aria-hidden="true"><div class="joystick-ring"></div><div class="joystick-knob" id="joystick-knob"></div></div>
+                  <span class="control-caption">移動</span>
+                </div>
+                <div class="dpad" id="touch-dpad" role="group" aria-label="移動用十字キー" hidden>
+                  <div class="dpad-grid">
+                    <button type="button" data-dir="up" aria-label="上に移動">▲</button>
+                    <button type="button" data-dir="left" aria-label="左に移動">◀</button>
+                    <button type="button" data-dir="down" aria-label="下に移動">▼</button>
+                    <button type="button" data-dir="right" aria-label="右に移動">▶</button>
+                  </div><span class="control-caption">移動</span>
+                </div>
+              </div>
+              <div class="touch-actions" id="touch-actions">
+                <button type="button" class="touch-pause" id="touch-pause" aria-label="一時停止">Ⅱ 一時停止</button>
+                <button type="button" id="touch-dash" class="dash-touch" aria-label="ダッシュする">DASH<span>ダッシュ</span></button>
+              </div>
+            </div>
+            <div class="game-frame"><canvas id="gameCanvas" width="320" height="240" tabindex="0" aria-label="Snack &amp; Dash（食べ物集め鬼ごっこ）のプレイ画面。矢印キーまたはWASDで移動、Bかスペースでダッシュ。ゲームパッドやタッチ操作にも対応。"></canvas></div>
           </div>
+          <div class="game-caption"><label class="hitbox-live-toggle"><span>当たり判定</span><input type="checkbox" id="play-hitboxes" checked role="switch" aria-label="当たり判定を表示"><strong id="hitbox-live-status">ON</strong></label><span>C 表示切替</span><span>ESC 一時停止</span><span>←↑→↓ / WASD 移動</span><span>B / SPACE ダッシュ</span></div>
+          <div class="controller-status" id="gamepad-status" role="status" aria-live="polite">ゲームパッド：未接続（接続後、ボタンを押すと認識されます）</div>
         </div>
         <aside class="game-sidebar">
           <div class="stat-box major"><small id="primary-label">回収した数</small><strong id="primary-stat">0.0 / 10.0</strong></div>
@@ -92,7 +112,7 @@
     <section class="screen" id="screen-how" hidden>
       <div class="eyebrow">HOW TO PLAY</div><h2 class="page-title">あそびかた</h2><p class="intro">操作はシンプル。鬼は時間とともに、ずっと速くなります。</p>
       <div class="guide-grid">
-        <article class="guide-card"><span class="guide-n">01</span><h3>移動する</h3><div class="keycap-row"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></div><p>方向キーかWASD。タッチやゲームパッドにも対応。</p></article>
+        <article class="guide-card"><span class="guide-n">01</span><h3>移動する</h3><div class="keycap-row"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></div><p>方向キーかWASD。タッチのジョイスティック・十字キー、ゲームパッドにも対応。</p></article>
         <article class="guide-card"><span class="guide-n">02</span><h3>ダッシュを重ねる</h3><div class="keycap-row"><kbd>B</kbd><kbd>SPACE</kbd><kbd>SHIFT</kbd></div><p>ダッシュを使うと2秒間加速。効果中にもう一度使うと、<b>速さが加算</b>されます。</p></article>
         <article class="guide-card"><span class="guide-n">03</span><h3>ぶつかったら？</h3><div class="pictoline"><span class="hit-symbol">!</span> <span>2秒間の無敵＋高速移動</span></div><p>ライフは1減るけれど、その後2秒間は無敵かつ高速になります。連続ダメージは受けません。</p></article>
         <article class="guide-card"><span class="guide-n">04</span><h3>ハンバーガー</h3><div class="pictoline"><span class="burger-symbol">≡</span><span>通常 / 高級</span></div><p>HBは10.0個分で勝利。3回に1回、鬼の位置に出現する金色のGOLDバーガーは通常の1.5倍サイズ・1.5個分。回収するとダッシュも1回増加。</p></article>
@@ -125,6 +145,14 @@
     <section class="screen" id="screen-settings" hidden>
       <div class="eyebrow">SETTINGS</div><h2 class="page-title">設定</h2><p class="intro">設定はこのブラウザに自動保存されます。</p>
       <div class="settings-list"><label><span><strong>BGM</strong><small>波形から生成したオリジナルBGM</small></span><input id="setting-music" type="checkbox" checked></label><label><span><strong>効果音</strong><small>ダッシュ・回収・被弾など</small></span><input id="setting-sfx" type="checkbox" checked></label><label><span><strong>音量</strong><small>マスター音量</small></span><input id="setting-volume" type="range" min="0" max="100" step="5" value="50"><output for="setting-volume" id="volume-output">50%</output></label><label><span><strong>ヒント表示</strong><small>ゲーム中の操作説明を表示</small></span><input id="setting-hints" type="checkbox" checked></label><label><span><strong>当たり判定を表示</strong><small>初期ON／プレイ中はCキーまたは画面のスイッチで切替</small></span><input id="setting-hitboxes" type="checkbox" role="switch" checked></label><label><span><strong>演出を控えめに</strong><small>点滅・動きの多い演出を軽減</small></span><input id="setting-motion" type="checkbox"></label></div>
+      <h3 class="small-heading">モバイル・コントローラー操作</h3>
+      <div class="settings-list control-settings">
+        <label><span><strong>タッチ操作の表示</strong><small>自動：タッチ対応端末で表示。PCでも強制表示できます。</small></span><select id="setting-touch-visible"><option value="auto">自動</option><option value="on">常にON</option><option value="off">OFF</option></select></label>
+        <label><span><strong>移動の操作方式</strong><small>ジョイスティック／十字キーを選べます。</small></span><select id="setting-touch-type"><option value="joystick">ジョイスティック</option><option value="dpad">十字キー</option></select></label>
+        <label><span><strong>左右の配置</strong><small>左利きの場合は左右反転できます。</small></span><select id="setting-touch-side"><option value="left">左：移動 ／ 右：ダッシュ</option><option value="right">右：移動 ／ 左：ダッシュ</option></select></label>
+        <label><span><strong>ジョイスティック感度</strong><small>中心付近の誤入力を防ぐデッドゾーン</small></span><input type="range" id="setting-stick-deadzone" min="5" max="40" step="5" value="15"><output id="setting-stick-output">15%</output></label>
+      </div>
+      <p class="subtle-note">コントローラー：左スティック／十字キーで移動、A・×・B相当でダッシュ、Menu・Options・＋相当で一時停止。機種・ブラウザにより対応が異なります。</p>
       <div class="inline-actions"><button type="button" id="test-sound" class="primary-button">効果音を試す ♪</button><button type="button" class="secondary-button" data-nav="home">タイトルに戻る</button></div>
       <p class="subtle-note">音はTone.js対応の波形合成エンジンで生成。外部音源ファイル不要。通信がない環境ではWeb Audio APIで再生できます。</p>
     </section>
@@ -143,7 +171,7 @@
         <div class="inline-actions center" id="result-next-actions" hidden><button type="button" id="result-retry" class="primary-button">もう一度遊ぶ →</button><button type="button" class="secondary-button" data-nav="home">モード選択へ</button><button type="button" class="secondary-button" data-nav="records">ランキングを見る</button></div></div>
     </section>
   </main>
-  <footer class="footer"><span>© 2026 Salt-Salt Games</span><span>Snack &amp; Dash <span class="footer-japanese">/ 食べ物集め鬼ごっこ</span> <b>v0.0.0.6</b></span></footer>
+  <footer class="footer"><span>© 2026 Salt-Salt Games</span><span>Snack &amp; Dash <span class="footer-japanese">/ 食べ物集め鬼ごっこ</span> <b>v0.0.1.0</b></span></footer>
 </div>
 <div id="pause-overlay" class="modal-backdrop" hidden><div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="pause-title"><div class="eyebrow">PAUSED</div><h2 id="pause-title">一時停止</h2><p>いつでも再開できます。</p><div class="modal-actions"><button type="button" class="primary-button" id="resume-btn">ゲームに戻る →</button><button type="button" class="secondary-button" id="quit-btn">タイトルへ戻る</button></div></div></div>
 </body>

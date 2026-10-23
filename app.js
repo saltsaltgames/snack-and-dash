@@ -4,7 +4,7 @@
 const KEY='saltsalt_foodtag_v1';
 const MAX_ENTRIES=500;
 const $=id=>document.getElementById(id);
-const defaultSettings=()=>({music:true,sfx:true,volume:50,hints:true,showHitboxes:true,reducedMotion:false});
+const defaultSettings=()=>({music:true,sfx:true,volume:50,hints:true,showHitboxes:true,reducedMotion:false,touchVisible:"auto",touchType:"joystick",touchSide:"left",stickDeadzone:15});
 const defaultData=()=>({version:2,lastPlayerName:'',settings:defaultSettings(),records:{endlessBest:0,hbBest:null,plays:0,hbClears:0,entries:[]}});
 const safeNumber=(value,maximum=1e12)=>Number.isFinite(Number(value))?Math.max(0,Math.min(maximum,Number(value))):0;
 const safeInt=(n,max=1e12)=>Math.floor(safeNumber(n,max));
@@ -34,6 +34,10 @@ const normalize=input=>{
  if(settings&&typeof settings==='object'){
   for(const key of ['music','sfx','hints','showHitboxes','reducedMotion'])if(typeof settings[key]==='boolean')clean.settings[key]=settings[key];
   if(Number.isFinite(Number(settings.volume)))clean.settings.volume=Math.min(100,Math.max(0,Number(settings.volume)));
+  if(['auto','on','off'].includes(settings.touchVisible))clean.settings.touchVisible=settings.touchVisible;
+  if(['joystick','dpad'].includes(settings.touchType))clean.settings.touchType=settings.touchType;
+  if(['left','right'].includes(settings.touchSide))clean.settings.touchSide=settings.touchSide;
+  if(Number.isFinite(Number(settings.stickDeadzone)))clean.settings.stickDeadzone=Math.min(40,Math.max(5,Number(settings.stickDeadzone)));
  }
  if(input.version===2&&typeof input.lastPlayerName==='string'){
   const name=cleanName(input.lastPlayerName);clean.lastPlayerName=name==='unknown'?'':name;
@@ -74,6 +78,7 @@ class App{
    onEnd:result=>this.gameEnded(result),onPause:paused=>this.setPauseOverlay(paused),
    onTutorialComplete:()=>this.tutorialComplete(),onHitboxToggle:checked=>this.setHitboxes(checked)
   });
+  this.controls=new SSGControls(this.game,this);this.game.controls=this.controls;
   this.screen='home';this.bind();this.save();this.applySettings();this.paintRecords();SSGArt.preview($('heroCanvas'));this.show('home');
  }
  bind(){
@@ -102,12 +107,18 @@ class App{
   for(const [id,name] of Object.entries(keys))$(id).addEventListener('change',e=>{this.data.settings[name]=e.target.checked;this.syncSettings();});
   $('play-hitboxes').addEventListener('change',e=>this.setHitboxes(e.target.checked));
   $('setting-volume').addEventListener('input',e=>{this.data.settings.volume=Number(e.target.value);this.syncSettings();});
-  for(const btn of document.querySelectorAll('[data-dir]')){
-   const dir=btn.dataset.dir;
-   btn.addEventListener('pointerdown',e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);this.game.setTouchDirection(dir,true);});
-   for(const ev of ['pointerup','pointercancel','lostpointercapture'])btn.addEventListener(ev,()=>this.game.setTouchDirection(dir,false));
+  // Native Pointer Events provide two-finger touch independent of keyboard/gamepads.
+  this.controls.bind();
+  for(const id of ['setting-touch-visible','setting-touch-type','setting-touch-side']){
+   $(id).addEventListener('change',()=>{
+    const key={'setting-touch-visible':'touchVisible','setting-touch-type':'touchType','setting-touch-side':'touchSide'}[id];
+    this.data.settings[key]=$(id).value;this.syncSettings();
+   });
   }
-  $('touch-dash').addEventListener('pointerdown',e=>{e.preventDefault();this.game.dash();});
+  $('setting-stick-deadzone').addEventListener('input',()=>{
+   this.data.settings.stickDeadzone=Number($('setting-stick-deadzone').value);
+   this.syncSettings();
+  });
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&this.game.running&&!this.game.paused)this.game.pause();});
  }
  navigate(screen){
@@ -122,7 +133,7 @@ class App{
   this.show(screen);
  }
  show(screen){
-  this.screen=screen;
+  this.screen=screen;document.body.classList.toggle('playing-game',screen==='play');this.controls?.clearTouch();
   for(const el of document.querySelectorAll('main > section.screen'))el.hidden=el.id!=='screen-'+screen;
   document.querySelectorAll('[data-nav]').forEach(el=>{const active=el.dataset.nav===screen;el.classList.toggle('active',active);if(active&&el.classList.contains('nav-button'))el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
   if(screen==='records')this.paintRecords();
@@ -136,12 +147,15 @@ class App{
   $('play-title').textContent=title;
   $('play-subtitle').textContent=mode==='hb'?'GAME / HB MODE':mode==='endless'?'GAME / ENDLESS':'PRACTICE / TUTORIAL';
   $('primary-label').textContent=mode==='endless'?'生存スコア':mode==='hb'?'集めたハンバーガー':'練習の進行';
-  $('tutorial-panel').hidden=mode!=='tutorial';
+  $('tutorial-panel').hidden=mode!=='tutorial';this.controls.clearTouch();
   await this.audio.init();
   if(this.screen!=='play'||this.lastMode!==mode)return;
   this.audio.setEnabled(this.data.settings.music,this.data.settings.sfx);
   this.game.start(mode,{hints:this.data.settings.hints,reducedMotion:this.data.settings.reducedMotion,showHitboxes:this.data.settings.showHitboxes});
   $('gameCanvas').focus({preventScroll:true});
+  if(document.documentElement.classList.contains('show-touch-controls')&&window.innerWidth<900){
+   document.querySelector('.arena-interactive').scrollIntoView({block:'start',behavior:'instant'});
+  }
  }
  updateHud(state){
   if(state.mode==='hb')$('primary-stat').textContent=state.food.toFixed(1)+' / 10.0';
@@ -224,7 +238,12 @@ class App{
  applySettings(){
   const s=this.data.settings;
   for(const [id,value] of [['setting-music',s.music],['setting-sfx',s.sfx],['setting-hints',s.hints],['setting-hitboxes',s.showHitboxes],['setting-motion',s.reducedMotion]])$(id).checked=value;
-  $('play-hitboxes').checked=s.showHitboxes;$('hitbox-live-status').textContent=s.showHitboxes?'ON':'OFF';$('setting-volume').value=String(s.volume);$('volume-output').textContent=s.volume+'%';document.querySelector('.tip-box').hidden=!s.hints;this.audio.setVolume(s.volume/100);this.audio.setEnabled(s.music,s.sfx);
+  $('play-hitboxes').checked=s.showHitboxes;$('hitbox-live-status').textContent=s.showHitboxes?'ON':'OFF';$('setting-volume').value=String(s.volume);$('volume-output').textContent=s.volume+'%';document.querySelector('.tip-box').hidden=!s.hints;this.audio.setVolume(s.volume/100);this.audio.setEnabled(s.music,s.sfx);this.controls?.applySettings(s);
+  $('setting-touch-visible').value=s.touchVisible;
+  $('setting-touch-type').value=s.touchType;
+  $('setting-touch-side').value=s.touchSide;
+  $('setting-stick-deadzone').value=String(s.stickDeadzone);
+  $('setting-stick-output').textContent=s.stickDeadzone+'%';
  }
  setHitboxes(checked){this.data.settings.showHitboxes=Boolean(checked);this.syncSettings();if(this.game.running)this.game.draw();}
  syncSettings(){this.applySettings();this.save();this.game.settings={hints:this.data.settings.hints,reducedMotion:this.data.settings.reducedMotion,showHitboxes:this.data.settings.showHitboxes};}

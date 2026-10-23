@@ -30,3 +30,82 @@
 .bottom-note a { color:var(--blue); font-weight:700; text-underline-offset:3px; overflow-wrap:anywhere; }
 .footer-japanese { color:var(--muted); }
 @media (max-width:650px) { .hero-copy h1 { font-size:clamp(36px,9vw,53px); } .footer { flex-wrap:wrap; } }
+
+/* v0.0.1.0: touch and gamepad input UI. Applies only to the play screen. */
+.controller-status {margin:8px 0 0;font-size:11px;color:var(--muted);overflow-wrap:anywhere;}
+.control-settings select {max-width:min(240px,46vw);min-height:44px;border:1px solid var(--ink);background:var(--panel);padding:7px 9px;color:var(--ink);font-weight:700;}
+.control-settings input[type=range] {min-width:80px;}
+.arena-interactive{min-width:0;display:flex;flex-direction:column;gap:0;}
+.touch-controls{display:none!important;justify-content:space-between;align-items:center;gap:20px;margin:12px 0 0;touch-action:none;user-select:none;-webkit-user-select:none;}
+.show-touch-controls .touch-controls{display:flex!important;}
+.touch-controls[data-handed="right"]{flex-direction:row-reverse;}
+.touch-move,.touch-actions{display:flex;align-items:center;justify-content:center;flex:none;min-width:0;}
+.touch-actions{flex-direction:column;gap:12px;}
+.joystick-area,.dpad{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;touch-action:none;user-select:none;}
+.joystick-area{width:140px;height:154px;}
+.joystick-base{position:relative;width:124px;height:124px;border:3px solid var(--ink);border-radius:50%;background:#e6e7c7;touch-action:none;}
+.joystick-ring{position:absolute;inset:20px;border:1px dashed #aaa991;border-radius:50%;pointer-events:none;}
+.joystick-knob{position:absolute;width:47px;height:47px;left:50%;top:50%;border-radius:50%;background:#303f47;border:3px solid #f9f8ea;box-shadow:0 0 0 2px #303f47;transform:translate(calc(-50% + var(--stick-x,0px)),calc(-50% + var(--stick-y,0px)));pointer-events:none;}
+.control-caption{font-size:11px;font-weight:800;color:var(--muted);}
+.dpad-grid{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:0;touch-action:none;}
+.dpad-grid button{width:44px;height:44px;min-width:0;min-height:0;background:#eaedcb;border:2px solid var(--ink);color:var(--ink);padding:0;touch-action:none;font-size:19px;}
+.dpad-grid [data-dir="up"]{grid-column:2;grid-row:1;}
+.dpad-grid [data-dir="left"]{grid-column:1;grid-row:2;}
+.dpad-grid [data-dir="right"]{grid-column:3;grid-row:2;}
+.dpad-grid [data-dir="down"]{grid-column:2;grid-row:3;}
+.dpad-grid button:active{background:var(--green);color:white;}
+.touch-pause{min-height:48px;min-width:100px;padding:5px 12px;border:2px solid var(--ink);background:var(--panel);font-size:12px;font-weight:850;touch-action:manipulation;}
+.dash-touch{height:94px;width:94px;min-height:94px;min-width:94px;border:3px solid var(--blue);background:#e6eecb;color:var(--blue);font-weight:900;font-size:20px;line-height:1.25;touch-action:none;}
+.dash-touch span{display:block;font-size:10px;font-weight:800;}
+.dash-touch:active{background:var(--blue);color:white;}
+.touch-controls [hidden]{display:none!important;}
+/* Small vertical screens: game first, then easily reachable two-thumb controls. */
+@media(max-width:440px){
+ .touch-controls{gap:8px;}
+ .joystick-area{width:115px;height:135px;}
+ .joystick-base{width:108px;height:108px;}
+ .joystick-knob{width:42px;height:42px;}
+ .dpad-grid{grid-template-columns:repeat(3,39px);grid-template-rows:repeat(3,39px);}
+ .dpad-grid button{width:39px;height:39px;}
+ .dash-touch{width:84px;height:84px;min-width:84px;min-height:84px;}
+ .touch-pause{min-width:86px;min-height:46px;}
+}
+/* Landscape on a phone: keep the game between left and right controls. */
+@media (orientation:landscape) and (max-height:850px) and (max-width:1250px){
+ .show-touch-controls .arena-interactive{display:grid;grid-template-columns:minmax(95px,1fr) minmax(0,2.8fr) minmax(95px,1fr);gap:8px;align-items:center;}
+ .show-touch-controls .touch-controls{display:contents!important;}
+ .show-touch-controls .game-frame{grid-row:1;grid-column:2;min-width:0;}
+ .show-touch-controls .touch-move{grid-row:1;grid-column:1;}
+ .show-touch-controls .touch-actions{grid-row:1;grid-column:3;}
+ .show-touch-controls [data-handed="right"] .touch-move{grid-column:3;}
+ .show-touch-controls [data-handed="right"] .touch-actions{grid-column:1;}
+ .show-touch-controls .joystick-area{width:min(20vw,120px);height:136px;}
+ .show-touch-controls .joystick-base{width:min(17vw,115px);height:min(17vw,115px);}
+ .show-touch-controls .dash-touch{width:76px;height:76px;min-width:76px;min-height:76px;}
+ .show-touch-controls .touch-pause{font-size:11px;min-width:85px;min-height:44px;}
+ .show-touch-controls .game-sidebar{display:none;}
+}
+
+/* Mobile portrait: game field comes before the thumb controls. */
+@media (orientation:portrait), (min-height:541px){
+ .arena-interactive .game-frame{order:0;}
+ .arena-interactive .touch-controls{order:1;}
+}
+/* When playing landscape on a touch screen, use an immersive layout without
+   removing the user's ability to pause or toggle the collider overlay. */
+@media (orientation:landscape) and (max-height:850px) and (max-width:1250px){
+ .show-touch-controls body.playing-game .site-header,
+ .show-touch-controls body.playing-game .footer,
+ .show-touch-controls body.playing-game .play-heading,
+ .show-touch-controls body.playing-game .controller-status,
+ .show-touch-controls body.playing-game .game-sidebar{display:none!important;}
+ .show-touch-controls body.playing-game #screen-play{padding:8px 0 6px;}
+ .show-touch-controls body.playing-game .game-caption>span{display:none;}
+ .show-touch-controls body.playing-game .game-caption{margin-top:6px;}
+ .show-touch-controls body.playing-game .shell{min-height:100svh;}
+ .show-touch-controls body.playing-game .arena-interactive{min-height:0;}
+}
+
+@media (orientation:landscape) and (max-height:850px) and (max-width:1250px){
+ .show-touch-controls body.playing-game .play-layout{grid-template-columns:minmax(0,1fr);}
+}

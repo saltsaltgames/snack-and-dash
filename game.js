@@ -36,11 +36,11 @@ class FoodTagGame {
  constructor(canvas,audio,callbacks={}){
   this.canvas=canvas;this.ctx=canvas.getContext('2d',{alpha:false});this.ctx.imageSmoothingEnabled=false;
   this.audio=audio;this.callbacks=callbacks;
-  this.settings={hints:true,reducedMotion:false,showHitboxes:true};this.keys=new Set();this.touchDirs=new Set();this.gamepadDash=false;
+  this.settings={hints:true,reducedMotion:false,showHitboxes:true};this.keys=new Set();this.touchDirs=new Set();this.gamepadDash=false;this.touchVector={x:0,y:0};this.touchActive=false;
   this.running=false;this.paused=false;this.raf=0;this.lastFrame=0;this.lastUi=0;
   this.boundKeyDown=e=>this.keyDown(e);this.boundKeyUp=e=>this.keyUp(e);
   window.addEventListener('keydown',this.boundKeyDown);window.addEventListener('keyup',this.boundKeyUp);
-  window.addEventListener('blur',()=>{this.keys.clear();this.gamepadDash=false;});
+  window.addEventListener('blur',()=>{this.keys.clear();this.gamepadDash=false;this.touchVector={x:0,y:0};this.touchActive=false;});
  }
  start(mode,settings={}){
   this.stop();this.settings={...this.settings,...settings};this.mode=mode;this.running=true;this.paused=false;
@@ -50,18 +50,18 @@ class FoodTagGame {
   this.enemy={x:282,y:210,vx:0,vy:0,burstEnd:0,nextBurstAt:6,lastTrailAt:-1};
   this.food=null;this.nextFoodAt=FOOD_INTERVAL_SECONDS;this.foodCycle=0;this.floating=[];this.particles=[];this.message=null;this.tutStep=0;this.tutWalk=0;
   this.tutAdvanceAt=0;this.tutorialComplete=false;this.tutorialEnemy=false;
-  this.keys.clear();this.touchDirs.clear();this.gamepadDash=false;this.lastUi=0;this.lastFrame=performance.now();
+  this.keys.clear();this.touchDirs.clear();this.gamepadDash=false;this.touchVector={x:0,y:0};this.touchActive=false;this.lastUi=0;this.lastFrame=performance.now();
   if(mode==='tutorial'){
    this.player={x:92,y:120,direction:'right',moving:false};
    this.enemy={x:260,y:160,vx:0,vy:0,burstEnd:0,nextBurstAt:Infinity,lastTrailAt:-1};
-   this.dashCharges=0;this.setTip('まずは矢印キーで歩いてみよう！','あそびかた');
+   this.dashCharges=0;this.setTip('まずは操作して歩いてみよう！','あそびかた');
   }else{
    this.setTip(mode==='hb'?'10個集めるとゲームクリア！':'逃げ続けてハイスコアに挑戦！','スタート');
   }
   this.audio.startMusic();this.updateUI(true);this.draw();this.raf=requestAnimationFrame(now=>this.loop(now));
  }
- stop(){this.running=false;this.paused=false;this.audio.stopMusic();cancelAnimationFrame(this.raf);this.keys.clear();this.touchDirs.clear();this.gamepadDash=false;}
- pause(){if(!this.running||this.paused)return;this.paused=true;this.keys.clear();this.touchDirs.clear();this.gamepadDash=false;this.audio.stopMusic();this.callbacks.onPause?.(true);}
+ stop(){this.running=false;this.paused=false;this.audio.stopMusic();cancelAnimationFrame(this.raf);this.keys.clear();this.touchDirs.clear();this.gamepadDash=false;this.touchVector={x:0,y:0};this.touchActive=false;this.controls?.clearTouch();}
+ pause(){if(!this.running||this.paused)return;this.paused=true;this.keys.clear();this.touchDirs.clear();this.gamepadDash=false;this.touchVector={x:0,y:0};this.touchActive=false;this.controls?.clearTouch();this.audio.stopMusic();this.callbacks.onPause?.(true);}
  resume(){if(!this.running||!this.paused)return;this.paused=false;this.lastFrame=performance.now();this.audio.startMusic();this.callbacks.onPause?.(false);this.canvas.focus({preventScroll:true});}
  togglePause(){this.paused?this.resume():this.pause();}
  keyDown(e){
@@ -70,12 +70,14 @@ class FoodTagGame {
   if(e.code==='Escape'||e.code==='KeyP'){if(!e.repeat)this.togglePause();return;}
   if(e.code==='KeyC'){if(!e.repeat)this.setHitboxes(!this.settings.showHitboxes);return;}
   if(this.paused)return;
+  if(MOVE_KEYS.has(e.code)||DASH_KEYS.has(e.code))if(this.controls)this.controls.lastInputDevice='keyboard';
   if(DASH_KEYS.has(e.code)&&!e.repeat&&!this.keys.has(e.code))this.dash();
   this.keys.add(e.code);
  }
  keyUp(e){if(this.running&&(MOVE_KEYS.has(e.code)||DASH_KEYS.has(e.code)))e.preventDefault();this.keys.delete(e.code);}
  setHitboxes(enabled){this.settings.showHitboxes=Boolean(enabled);this.callbacks.onHitboxToggle?.(this.settings.showHitboxes);this.draw();}
  setTouchDirection(dir,pressed){if(pressed)this.touchDirs.add(dir);else this.touchDirs.delete(dir);}
+ setTouchAnalog(x,y,active){this.touchActive=Boolean(active);this.touchVector={x:clamp(x,-1,1),y:clamp(y,-1,1)};}
  currentDashCount(){return this.dashes.filter(d=>d>this.t).length;}
  playerSpeed(){return BASE_SPEED+this.currentDashCount()*DASH_BONUS+(this.hitBoostEnd>this.t?HIT_BONUS:0);}
  enemySpeed(){return this.t*1000*ENEMY_ACCEL_PER_MS;}
@@ -104,7 +106,7 @@ class FoodTagGame {
  }
  tutorialDescription(){
   return [
-   {title:'歩いてみよう',description:'矢印キー / WASD / 画面の方向ボタンで合計50px移動！',progress:clamp(this.tutWalk/50,0,1)},
+   {title:'歩いてみよう',description:'矢印キー / WASD / ジョイスティック・十字キーで合計50px移動！',progress:clamp(this.tutWalk/50,0,1)},
    {title:'ハンバーガーを集めよう',description:'画面のハンバーガーに触れて回収。',progress:0},
    {title:'ダッシュしてみよう',description:'B / SPACE / SHIFT / DASHボタンでダッシュ！',progress:0},
    {title:'速さを重ねてみよう',description:'速い状態のまま、もう一度ダッシュ！ 速度が加算されるよ。',progress:Math.min(1,this.currentDashCount()/2)},
@@ -197,20 +199,7 @@ class FoodTagGame {
   const result={mode:this.mode,won:Boolean(won),score:this.progressScore,seconds:this.t,food:this.foodHalfUnits/2,foodHalfUnits:this.foodHalfUnits,life:this.life};
   this.stop();this.audio.effect(won?'clear':'lose');this.callbacks.onEnd?.(result);
  }
- gamepadInput(){
-  let x=0,y=0,pressed=false;
-  try{
-   const pad=typeof navigator.getGamepads==='function'?Array.from(navigator.getGamepads()).find(Boolean):null;
-   if(pad){
-    const axisX=pad.axes[0]||0,axisY=pad.axes[1]||0;
-    x=(Math.abs(axisX)>.2?axisX:0)+(pad.buttons[15]?.pressed?1:0)-(pad.buttons[14]?.pressed?1:0);
-    y=(Math.abs(axisY)>.2?axisY:0)+(pad.buttons[13]?.pressed?1:0)-(pad.buttons[12]?.pressed?1:0);
-    pressed=Boolean(pad.buttons[1]?.pressed||pad.buttons[0]?.pressed);
-   }
-  }catch(_){/* restricted browser */}
-  if(pressed&&!this.gamepadDash)this.dash();this.gamepadDash=pressed;
-  return {x:clamp(x,-1,1),y:clamp(y,-1,1)};
- }
+ gamepadInput(){return this.controls?.gamepadVector()||{x:0,y:0};}
  loop(now){
   if(!this.running)return;
   const elapsed=Math.max(0,(now-this.lastFrame)/1000);this.lastFrame=now;
@@ -242,9 +231,13 @@ class FoodTagGame {
   if(this.keys.has('ArrowUp')||this.keys.has('KeyW')||this.touchDirs.has('up'))dy--;
   if(this.keys.has('ArrowDown')||this.keys.has('KeyS')||this.touchDirs.has('down'))dy++;
   const pad=this.gamepadInput();
-  // Give an actively held keyboard/touch input priority over any gamepad drift.
+  // One active input source wins: no cancellation by drifting gamepads.
+  // Keyboard/D-pad outranks analog touch, analog touch outranks gamepad.
   const directInput=this.touchDirs.size>0||Array.from(MOVE_KEYS).some(key=>this.keys.has(key));
-  if(!directInput){dx=pad.x;dy=pad.y;}
+  if(!directInput){
+    if(this.touchActive){dx=this.touchVector.x;dy=this.touchVector.y;}
+    else {dx=pad.x;dy=pad.y;}
+  }
   const length=Math.hypot(dx,dy);p.moving=length>.01;
   if(length>.01){dx/=length;dy/=length;
    p.x=clamp(p.x+dx*this.playerSpeed()*dt,9,WIDTH-9);
